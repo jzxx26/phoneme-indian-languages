@@ -1,0 +1,38 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Indic scripts need a font stack that actually ships the glyphs, and a
+     slightly larger optical size than Latin to stay readable. */
+  --font-indic:
+    'Noto Sans Tamil', 'Latha', 'Nirmala UI', 'Tamil Sangam MN', system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Indic text renders small at the same font-size as Latin. */
+.font-indic {
+  font-family: var(--font-indic);
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

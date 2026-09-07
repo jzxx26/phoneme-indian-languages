@@ -1,0 +1,63 @@
+/**
+ * Central language registry.
+ *
+ * Nothing in the application should hardcode "ta-IN" or "Tamil" outside of this
+ * file. Pages, API routes and the assessment providers all take a `locale`
+ * string and look it up here. Adding a language in a later review means adding
+ * one entry below plus a row in `public.languages` - no business logic changes.
+ */
+
+export interface LanguageConfig {
+  /** BCP-47 locale used by the assessment provider (e.g. Azure Speech). */
+  code: string;
+  /** English name. */
+  name: string;
+  /** Name in the language's own script. */
+  nativeName: string;
+  /** Whether the locale is enabled for practice in the current release. */
+  enabled: boolean;
+  /**
+   * Tailwind-friendly font stack hint for scripts that need a larger optical
+   * size to stay readable (Indic scripts render small at default sizes).
+   */
+  scriptClassName: string;
+}
+
+export const LANGUAGES: readonly LanguageConfig[] = [
+  {
+    code: 'ta-IN',
+    name: 'Tamil',
+    nativeName: 'தமிழ்',
+    enabled: true,
+    scriptClassName: 'font-indic',
+  },
+  // Review 2 and 3 will append additional Indian languages here.
+] as const;
+
+/** The locale used when a caller does not specify one. */
+export const DEFAULT_LANGUAGE_CODE = 'ta-IN';
+
+export function getLanguages(): LanguageConfig[] {
+  return LANGUAGES.filter((language) => language.enabled);
+}
+
+export function getLanguage(code: string | null | undefined): LanguageConfig | undefined {
+  if (!code) return undefined;
+  return LANGUAGES.find((language) => language.code.toLowerCase() === code.toLowerCase());
+}
+
+/** Returns the requested locale if it is enabled, otherwise the default one. */
+export function resolveLanguage(code: string | null | undefined): LanguageConfig {
+  const requested = getLanguage(code);
+  if (requested?.enabled) return requested;
+
+  const fallback = getLanguage(DEFAULT_LANGUAGE_CODE);
+  if (!fallback) {
+    throw new Error(`Default language "${DEFAULT_LANGUAGE_CODE}" is missing from the registry.`);
+  }
+  return fallback;
+}
+
+export function isLanguageEnabled(code: string | null | undefined): boolean {
+  return getLanguage(code)?.enabled ?? false;
+}

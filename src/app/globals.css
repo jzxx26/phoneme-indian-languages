@@ -4,7 +4,8 @@
   /* Indic scripts need a font stack that actually ships the glyphs, and a
      slightly larger optical size than Latin to stay readable. */
   --font-indic:
-    'Noto Sans Tamil', 'Latha', 'Nirmala UI', 'Tamil Sangam MN', system-ui, sans-serif;
+    'Noto Sans Tamil', 'Noto Sans Devanagari', 'Latha', 'Mangal', 'Nirmala UI',
+    'Tamil Sangam MN', 'Kohinoor Devanagari', 'Devanagari Sangam MN', system-ui, sans-serif;
 }
 
 :root {

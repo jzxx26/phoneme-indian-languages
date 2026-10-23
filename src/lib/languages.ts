@@ -62,6 +62,18 @@ export const LANGUAGES: readonly LanguageConfig[] = [
     segmentation: 'latin-letters',
     unitsLabel: 'English letter sequence',
   },
+  {
+    code: 'hi-IN',
+    name: 'Hindi',
+    nativeName: 'हिन्दी',
+    enabled: true,
+    scriptClassName: 'font-indic',
+    spokenSpelling: false,
+    segmentation: 'graphemes',
+    unitsLabel: 'Hindi letters (स्वर / व्यंजन / मात्रा)',
+    spellingNote:
+      'Hindi is written in Devanagari: vowels (स्वर), consonants (व्यंजन) and vowel signs (मात्रा) that attach to a consonant. Each unit is read as a syllable rather than as a letter name.',
+  },
 ] as const;
 
 /** The locale used when a caller does not specify one. */

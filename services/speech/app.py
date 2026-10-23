@@ -30,6 +30,8 @@ SAMPLE_RATE = 16_000
 MAX_SECONDS = 30
 # Quieter than this (RMS of [-1, 1] samples) is treated as silence.
 SILENCE_RMS = 0.003
+# 30 s of 16 kHz mono 16-bit PCM is ~960 KB; matches the app's own upload cap.
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 
 _model = None
 
@@ -55,6 +57,12 @@ def decode_wav(data: bytes) -> np.ndarray:
     try:
         with wave.open(io.BytesIO(data)) as wav:
             channels, width, rate = wav.getnchannels(), wav.getsampwidth(), wav.getframerate()
+            # Validate the header before reading or resampling anything, so a
+            # forged header cannot inflate a small upload into a huge array.
+            if not (1 <= channels <= 2 and 8_000 <= rate <= 48_000):
+                raise ScoringError("provider_rejected_audio", "Unsupported WAV channel count or sample rate.", 400)
+            if wav.getnframes() > rate * MAX_SECONDS:
+                raise ScoringError("provider_rejected_audio", "Recording is longer than 30 seconds.", 400)
             frames = wav.readframes(wav.getnframes())
     except (wave.Error, EOFError) as exc:
         raise ScoringError("provider_rejected_audio", f"Expected a PCM WAV file ({exc}).", 400) from exc
@@ -95,7 +103,10 @@ def assess(
             return _error(401, "provider_unauthorized", "Invalid speech service token.")
 
     try:
-        samples = decode_wav(audio.file.read())
+        data = audio.file.read(MAX_UPLOAD_BYTES + 1)
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise ScoringError("provider_rejected_audio", "Recording is too large.", 413)
+        samples = decode_wav(data)
         if samples.size > SAMPLE_RATE * MAX_SECONDS:
             raise ScoringError("provider_rejected_audio", "Recording is longer than 30 seconds.", 400)
         if samples.size < SAMPLE_RATE // 4 or float(np.sqrt(np.mean(samples**2))) < SILENCE_RMS:

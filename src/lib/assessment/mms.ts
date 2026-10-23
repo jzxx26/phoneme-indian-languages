@@ -62,9 +62,10 @@ export const mmsProvider: AssessmentProvider = {
           504,
         );
       }
+      console.error(`[mms] could not reach the speech scoring service at ${url}`, error);
       throw new AssessmentError(
         'provider_unavailable',
-        `Could not reach the speech scoring service at ${url}. Is it running? See services/speech/README.md.`,
+        'The pronunciation scoring service is unavailable. Please try again shortly.',
         503,
       );
     } finally {

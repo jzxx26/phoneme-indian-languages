@@ -57,7 +57,7 @@ export default async function HistoryPage({
           <Card className="mt-6">
             <p className="text-slate-600">
               You have not recorded anything yet.{' '}
-              <Link href="/practice" className="font-medium text-slate-900 underline">
+              <Link href={`/practice?lang=${encodeURIComponent(language.code)}`} className="font-medium text-slate-900 underline">
                 Start practising
               </Link>{' '}
               to build up your history.

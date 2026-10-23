@@ -21,6 +21,22 @@ export interface LanguageConfig {
    * size to stay readable (Indic scripts render small at default sizes).
    */
   scriptClassName: string;
+  /**
+   * Whether learners can spell the word aloud letter by letter and have it
+   * checked. Only meaningful for alphabets with spoken letter names.
+   */
+  spokenSpelling: boolean;
+  /**
+   * How a word is broken into units for the spelling breakdown:
+   * - 'latin-letters': A-Z letters ("teeth" -> T E E T H)
+   * - 'graphemes': user-perceived characters via Intl.Segmenter, so combining
+   *   vowel signs and viramas stay attached to their consonant.
+   */
+  segmentation: 'latin-letters' | 'graphemes';
+  /** Heading shown above the spelling breakdown. */
+  unitsLabel: string;
+  /** Optional script-specific explanation shown with the breakdown. */
+  spellingNote?: string;
 }
 
 export const LANGUAGES: readonly LanguageConfig[] = [
@@ -30,6 +46,11 @@ export const LANGUAGES: readonly LanguageConfig[] = [
     nativeName: 'தமிழ்',
     enabled: true,
     scriptClassName: 'font-indic',
+    spokenSpelling: false,
+    segmentation: 'graphemes',
+    unitsLabel: 'Tamil letters (உயிர் / மெய் / உயிர்மெய்)',
+    spellingNote:
+      'Tamil words are written with vowels (உயிர்), pure consonants with pulli (மெய்) and consonant-vowel combinations (உயிர்மெய்). Each unit is read as a syllable rather than as a letter name.',
   },
   {
     code: 'en-IN',
@@ -37,6 +58,9 @@ export const LANGUAGES: readonly LanguageConfig[] = [
     nativeName: 'English',
     enabled: true,
     scriptClassName: 'font-sans',
+    spokenSpelling: true,
+    segmentation: 'latin-letters',
+    unitsLabel: 'English letter sequence',
   },
 ] as const;
 

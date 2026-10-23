@@ -69,6 +69,8 @@ export function PracticeSession({
   // --- Feature 2: Teach before speaking ---
   const [hasBeenTaught, setHasBeenTaught] = useState(false);
   const [isSpeakingTarget, setIsSpeakingTarget] = useState(false);
+  /** Set when the browser has no voice for this language. */
+  const [missingVoice, setMissingVoice] = useState(false);
 
   // --- Feature 3: Spelling Practice mode ---
   const [activeTab, setActiveTab] = useState<ActiveTab>('pronunciation');
@@ -130,13 +132,14 @@ export function PracticeSession({
     }
 
     setIsSpeakingTarget(true);
-    await speakWord(sentence.text, sentence.language_code, {
+    const outcome = await speakWord(sentence.text, sentence.language_code, {
       onStart: () => setIsSpeakingTarget(true),
       onEnd: () => {
         setIsSpeakingTarget(false);
         setHasBeenTaught(true);
       },
     });
+    setMissingVoice(outcome === 'no-voice');
   }, [isSpeechSupported, sentence.language_code, sentence.text]);
 
   const handleRevealWord = useCallback(() => {
@@ -215,6 +218,7 @@ export function PracticeSession({
       setIsWordRevealed(nextSentence.kind !== 'word');
       setHasBeenTaught(false);
       setIsSpeakingTarget(false);
+      setMissingVoice(false);
       setActiveTab('pronunciation');
       resetOutcome();
     },
@@ -320,6 +324,13 @@ export function PracticeSession({
                 </button>
               </div>
             </div>
+
+            {missingVoice ? (
+              <p role="status" className="mt-2 text-xs text-amber-800">
+                No {language.name} voice is installed in this browser, so the word cannot be played.
+                You can still record your pronunciation.
+              </p>
+            ) : null}
 
             <p className={`${language.scriptClassName} mt-2 text-3xl font-semibold leading-snug text-slate-900 sm:text-4xl`}>
               {sentence.text}

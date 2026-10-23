@@ -49,7 +49,7 @@ export function WordImage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageSrc}
-          alt={initial.alt}
+          alt={isRevealed ? initial.alt : 'Picture clue for the practice word'}
           onError={handleImageError}
           className="h-auto max-h-56 w-full object-contain p-2"
           loading="eager"

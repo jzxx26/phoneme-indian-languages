@@ -97,7 +97,7 @@ export default async function DashboardPage({
           <div className="flex items-center justify-between gap-3">
             <CardTitle>Recent attempts</CardTitle>
             {recent.length > 0 ? (
-              <Link href="/history" className="text-sm font-medium text-slate-600 hover:text-slate-900">
+              <Link href={`/history?lang=${encodeURIComponent(language.code)}`} className="text-sm font-medium text-slate-600 hover:text-slate-900">
                 View all →
               </Link>
             ) : null}

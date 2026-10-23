@@ -6,8 +6,6 @@ import { requireSession } from '@/lib/session';
 import { DEFAULT_LANGUAGE_CODE, resolveLanguage } from '@/lib/languages';
 import type { SentenceProgressRow, SentenceRow } from '@/types/database';
 
-import { DEMO_ENGLISH_SENTENCES } from '@/lib/demo-sentences';
-
 export const dynamic = 'force-dynamic';
 
 type PracticeSentence = Pick<
@@ -46,9 +44,26 @@ export default async function PracticePage({
       >(),
   ]);
 
-  let sentences = sentencesResponse.data ?? [];
-  if (sentences.length === 0 && language.code.startsWith('en')) {
-    sentences = DEMO_ENGLISH_SENTENCES;
+  const sentences = sentencesResponse.data ?? [];
+
+  if (sentencesResponse.error) {
+    return (
+      <>
+        <NavBar displayName={displayName} language={language} />
+        <main className="mx-auto max-w-4xl px-4 py-8">
+          <Card>
+            <h1 className="text-xl font-bold text-slate-900">Could not load practice content</h1>
+            <p className="mt-2 text-slate-600">
+              The database did not respond. Check that the Supabase project is running (free
+              projects pause after a period of inactivity) and reload this page.
+            </p>
+            <Link href={`/dashboard?lang=${encodeURIComponent(language.code)}`} className="mt-4 inline-block font-medium text-slate-700 underline">
+              Back to dashboard
+            </Link>
+          </Card>
+        </main>
+      </>
+    );
   }
 
   if (sentences.length === 0) {
@@ -59,13 +74,12 @@ export default async function PracticePage({
           <Card>
             <h1 className="text-xl font-bold text-slate-900">No practice content available</h1>
             <p className="mt-2 text-slate-600">
-              There are no active {language.name} items in the database yet. Run the seed script
-              <code className="mx-1 rounded bg-slate-100 px-1.5 py-0.5 text-sm">
-                supabase/seed/0002_seed_tamil.sql
-              </code>
+              There are no active {language.name} items in the database yet. Run the{' '}
+              {language.name} seed script from
+              <code className="mx-1 rounded bg-slate-100 px-1.5 py-0.5 text-sm">supabase/seed/</code>
               and reload this page.
             </p>
-            <Link href="/dashboard" className="mt-4 inline-block font-medium text-slate-700 underline">
+            <Link href={`/dashboard?lang=${encodeURIComponent(language.code)}`} className="mt-4 inline-block font-medium text-slate-700 underline">
               Back to dashboard
             </Link>
           </Card>

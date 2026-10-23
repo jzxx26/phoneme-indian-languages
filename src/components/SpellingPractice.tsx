@@ -10,7 +10,7 @@ import {
   isSpeechSynthesisSupported,
   speakSpellingSequence,
 } from '@/lib/audio/speech';
-import type { LanguageConfig } from '@/lib/languages';
+import { getLanguages, type LanguageConfig } from '@/lib/languages';
 import type { SpellingAssessmentResult } from '@/lib/assessment/spelling';
 import type { PracticeSentence } from '@/components/PracticeSession';
 
@@ -30,24 +30,28 @@ export function SpellingPractice({
   const [activeLetterIndex, setActiveLetterIndex] = useState<number>(-1);
   const [isTeachingAloud, setIsTeachingAloud] = useState(false);
   const [hasHeardSpelling, setHasHeardSpelling] = useState(false);
+  const [missingVoice, setMissingVoice] = useState(false);
 
   const [phase, setPhase] = useState<'idle' | 'recording' | 'assessing' | 'done' | 'error'>('idle');
   const [result, setResult] = useState<SpellingAssessmentResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const breakdown = getScriptBreakdown(sentence.text, sentence.language_code);
+  const breakdown = getScriptBreakdown(sentence.text, language);
   const isSpeechSupported = isSpeechSynthesisSupported();
+  const spellingLanguages = getLanguages()
+    .filter((l) => l.spokenSpelling)
+    .map((l) => l.name);
 
   // ---------------------------------------------------------------------------
   // Teach Spelling Aloud
   // ---------------------------------------------------------------------------
   const handleTeachSpelling = useCallback(async () => {
-    if (!breakdown.isEnglish || breakdown.units.length === 0) return;
+    if (!breakdown.spokenSpellingSupported || breakdown.units.length === 0) return;
 
     setIsTeachingAloud(true);
     cancelSpeech();
 
-    await speakSpellingSequence(breakdown.units, sentence.language_code, {
+    const outcome = await speakSpellingSequence(breakdown.units, sentence.language_code, {
       onActiveIndex: (index) => setActiveLetterIndex(index),
       onComplete: () => {
         setIsTeachingAloud(false);
@@ -55,7 +59,8 @@ export function SpellingPractice({
         setHasHeardSpelling(true);
       },
     });
-  }, [breakdown.isEnglish, breakdown.units, sentence.language_code]);
+    setMissingVoice(outcome === 'no-voice');
+  }, [breakdown.spokenSpellingSupported, breakdown.units, sentence.language_code]);
 
   // ---------------------------------------------------------------------------
   // Check Learner's Spoken Spelling
@@ -131,7 +136,7 @@ export function SpellingPractice({
           </span>
           <div>
             <CardTitle>Spelling Teaching & Spoken Check</CardTitle>
-            <p className="text-xs text-slate-500">{breakdown.scriptLabel}</p>
+            <p className="text-xs text-slate-500">{breakdown.unitsLabel}</p>
           </div>
         </div>
 
@@ -141,17 +146,17 @@ export function SpellingPractice({
           </span>
         ) : (
           <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
-            Tamil script breakdown only
+            Script breakdown only
           </span>
         )}
       </div>
 
-      {/* ---------------------------------------------------------------- Tamil Case */}
-      {breakdown.isTamil ? (
+      {/* ------------------------------------- Languages without spoken spelling */}
+      {!breakdown.spokenSpellingSupported ? (
         <div className="mt-4 space-y-4">
           <div className="rounded-xl border border-indigo-100 bg-white p-4 shadow-xs">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Syllabic Grapheme Units (அகரவரிசை எழுத்துக்கள்)
+              Letters in this word
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {breakdown.units.map((unit, idx) => (
@@ -159,16 +164,14 @@ export function SpellingPractice({
                   key={`${unit}-${idx}`}
                   className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 shadow-xs"
                 >
-                  <span className="font-indic text-2xl font-bold text-slate-900">{unit}</span>
+                  <span className={`${language.scriptClassName} text-2xl font-bold text-slate-900`}>{unit}</span>
                   <span className="mt-1 text-[10px] text-slate-400">Unit {idx + 1}</span>
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-slate-600">
-              In Tamil, words are written in syllabic graphemes composed of vowels (உயிர்), pure consonants
-              with pulli (மெய்), and consonant-vowel combinations (உயிர்மெய்). They are pronounced as
-              syllables rather than isolated Latin letter names.
-            </p>
+            {breakdown.note ? (
+              <p className="mt-3 text-xs leading-relaxed text-slate-600">{breakdown.note}</p>
+            ) : null}
           </div>
 
           <div
@@ -178,11 +181,12 @@ export function SpellingPractice({
             <div className="flex items-start gap-2">
               <span className="text-base">ℹ️</span>
               <div>
-                <p className="font-semibold">Tamil spoken spelling check is unsupported</p>
+                <p className="font-semibold">Spoken spelling check is not available for {language.name}</p>
                 <p className="mt-1">
-                  Azure Speech Pronunciation Assessment does not provide acoustic models for spoken Tamil
-                  letter names (எழுத்துக் கூட்டி வாசித்தல்). We do not fake assessment scores. Spoken
-                  letter-name evaluation is active for English practice items.
+                  {spellingLanguages.length > 0
+                    ? `Spoken spelling check is available for ${spellingLanguages.join(', ')} only. `
+                    : ''}
+                  Use the letters above to study the word, then practise saying the whole word.
                 </p>
               </div>
             </div>
@@ -202,7 +206,7 @@ export function SpellingPractice({
           ) : null}
         </div>
       ) : (
-        /* --------------------------------------------------------------- English Case */
+        /* ------------------------------------------- Languages with spoken spelling */
         <div className="mt-4 space-y-5">
           {/* Visual letter tiles */}
           <div>
@@ -249,6 +253,11 @@ export function SpellingPractice({
                   : 'Spells the target aloud letter by letter'
                 : 'Speech synthesis not supported in this browser'}
             </span>
+            {missingVoice ? (
+              <span role="status" className="w-full text-xs text-amber-800">
+                No {language.name} voice is installed in this browser, so the spelling cannot be played.
+              </span>
+            ) : null}
           </div>
 
           {/* Spoken Spelling Check Section */}

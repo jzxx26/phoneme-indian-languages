@@ -1,13 +1,24 @@
 /**
- * Browser Speech Synthesis and Multilingual Script Segmentation utilities.
+ * Browser Speech Synthesis and multilingual script segmentation utilities.
  *
  * Implements:
  * 1. Target word audio teaching via Web Speech API (window.speechSynthesis)
  * 2. Letter-by-letter spelling pronunciation with synchronized visual highlighting
- * 3. Script-appropriate linguistic segmentation:
- *    - For Tamil (ta-IN): true syllabic graphemes (uyir/mei/uyirmei) via Intl.Segmenter
- *    - For English: uppercase letter sequence (e.g. "teeth" -> ['T', 'E', 'E', 'T', 'H'])
+ * 3. Script-appropriate segmentation, driven by the language registry:
+ *    - 'graphemes': user-perceived characters via Intl.Segmenter, so vowel
+ *      signs and viramas stay attached to their consonant
+ *    - 'latin-letters': uppercase letter sequence ("teeth" -> T E E T H)
+ *
+ * Nothing here knows about specific languages: voices are matched by the
+ * locale string, and segmentation comes from `LanguageConfig`.
  */
+
+import type { LanguageConfig } from '@/lib/languages';
+
+/** How long to wait for the browser to load its voice list. */
+const VOICE_LOAD_TIMEOUT_MS = 1500;
+
+export type SpeakOutcome = 'spoken' | 'no-voice' | 'unsupported';
 
 export function isSpeechSynthesisSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -24,91 +35,101 @@ export function cancelSpeech(): void {
 }
 
 /**
- * Normalises a locale to browser TTS voice tags.
+ * Returns the browser's voices. Chrome populates the list asynchronously, so
+ * an empty first read waits for `voiceschanged` (bounded by a timeout).
  */
-function normalizeLocale(locale: string): string {
-  const lower = locale.toLowerCase();
-  if (lower.startsWith('ta')) return 'ta-IN';
-  if (lower.startsWith('en')) return 'en-IN';
-  return locale;
+function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (!isSpeechSynthesisSupported()) return Promise.resolve([]);
+
+  const synth = window.speechSynthesis;
+  const initial = synth.getVoices();
+  if (initial.length > 0) return Promise.resolve(initial);
+
+  return new Promise((resolve) => {
+    const finish = () => {
+      synth.removeEventListener('voiceschanged', finish);
+      clearTimeout(timer);
+      resolve(synth.getVoices());
+    };
+    const timer = setTimeout(finish, VOICE_LOAD_TIMEOUT_MS);
+    synth.addEventListener('voiceschanged', finish);
+  });
 }
 
-function findBestVoice(locale: string): SpeechSynthesisVoice | null {
-  if (!isSpeechSynthesisSupported()) return null;
-  const voices = window.speechSynthesis.getVoices();
-  const target = normalizeLocale(locale).toLowerCase();
+function normaliseTag(tag: string): string {
+  return tag.replace('_', '-').toLowerCase();
+}
 
-  // Exact match
-  const exact = voices.find((v) => v.lang.toLowerCase() === target);
+/** Exact locale match first, then any voice for the same base language. */
+function pickVoice(voices: SpeechSynthesisVoice[], locale: string): SpeechSynthesisVoice | null {
+  const target = normaliseTag(locale);
+  const exact = voices.find((v) => normaliseTag(v.lang) === target);
   if (exact) return exact;
 
-  // Prefix match (e.g. 'ta' for 'ta-IN')
-  const prefix = target.split('-')[0];
-  const byPrefix = voices.find((v) => v.lang.toLowerCase().startsWith(prefix));
-  if (byPrefix) return byPrefix;
-
-  // If English, any en voice
-  if (prefix === 'en') {
-    const anyEn = voices.find((v) => v.lang.toLowerCase().startsWith('en'));
-    if (anyEn) return anyEn;
-  }
-
-  return null;
+  const base = target.split('-')[0];
+  return voices.find((v) => normaliseTag(v.lang).split('-')[0] === base) ?? null;
 }
 
-/**
- * Speaks a word or short phrase aloud using browser SpeechSynthesis.
- */
-export function speakWord(
-  text: string,
-  locale: string,
-  options?: { rate?: number; onStart?: () => void; onEnd?: () => void },
-): Promise<void> {
+async function findVoice(locale: string): Promise<SpeechSynthesisVoice | null> {
+  return pickVoice(await loadVoices(), locale);
+}
+
+/** Whether this browser has a voice that can speak `locale`. */
+export async function hasVoiceFor(locale: string): Promise<boolean> {
+  return (await findVoice(locale)) !== null;
+}
+
+function speakWithVoice(text: string, voice: SpeechSynthesisVoice, rate: number): Promise<void> {
   return new Promise((resolve) => {
-    if (!isSpeechSynthesisSupported()) {
-      options?.onEnd?.();
-      resolve();
-      return;
-    }
-
-    cancelSpeech();
-
     const utterance = new SpeechSynthesisUtterance(text);
-    const targetLang = normalizeLocale(locale);
-    utterance.lang = targetLang;
-    utterance.rate = options?.rate ?? 0.85; // Slightly slower for clear teaching articulation
-
-    const voice = findBestVoice(locale);
-    if (voice) {
-      utterance.voice = voice;
-    }
-
-    utterance.onstart = () => {
-      options?.onStart?.();
-    };
-
-    utterance.onend = () => {
-      options?.onEnd?.();
-      resolve();
-    };
-
-    utterance.onerror = () => {
-      options?.onEnd?.();
-      resolve();
-    };
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    utterance.rate = rate;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
 
     try {
       window.speechSynthesis.speak(utterance);
     } catch {
-      options?.onEnd?.();
       resolve();
     }
   });
 }
 
 /**
- * Speaks an English letter sequence aloud letter-by-letter with a short pause
- * and an active index callback for UI highlighting.
+ * Speaks a word or short phrase aloud using browser SpeechSynthesis.
+ *
+ * When no voice for the language is installed it does NOT fall back to a
+ * different language's voice (that would teach the wrong pronunciation); it
+ * resolves 'no-voice' so the caller can tell the learner.
+ */
+export async function speakWord(
+  text: string,
+  locale: string,
+  options?: { rate?: number; onStart?: () => void; onEnd?: () => void },
+): Promise<SpeakOutcome> {
+  if (!isSpeechSynthesisSupported()) {
+    options?.onEnd?.();
+    return 'unsupported';
+  }
+
+  cancelSpeech();
+  const voice = await findVoice(locale);
+  if (!voice) {
+    options?.onEnd?.();
+    return 'no-voice';
+  }
+
+  options?.onStart?.();
+  // Slightly slower for clear teaching articulation.
+  await speakWithVoice(text, voice, options?.rate ?? 0.85);
+  options?.onEnd?.();
+  return 'spoken';
+}
+
+/**
+ * Speaks a letter sequence aloud letter-by-letter with a short pause and an
+ * active index callback for UI highlighting.
  */
 export async function speakSpellingSequence(
   letters: string[],
@@ -117,38 +138,24 @@ export async function speakSpellingSequence(
     onActiveIndex?: (index: number) => void;
     onComplete?: () => void;
   },
-): Promise<void> {
+): Promise<SpeakOutcome> {
   if (!isSpeechSynthesisSupported() || letters.length === 0) {
     options?.onComplete?.();
-    return;
+    return 'unsupported';
   }
 
   cancelSpeech();
+  const voice = await findVoice(locale);
+  if (!voice) {
+    options?.onComplete?.();
+    return 'no-voice';
+  }
 
   for (let i = 0; i < letters.length; i += 1) {
     options?.onActiveIndex?.(i);
-    const letter = letters[i];
+    await speakWithVoice(letters[i], voice, 0.8);
 
-    await new Promise<void>((resolveLetter) => {
-      // For individual English letters, speaking letter name clearly
-      const utterance = new SpeechSynthesisUtterance(letter);
-      utterance.lang = normalizeLocale(locale);
-      utterance.rate = 0.8;
-
-      const voice = findBestVoice(locale);
-      if (voice) utterance.voice = voice;
-
-      utterance.onend = () => resolveLetter();
-      utterance.onerror = () => resolveLetter();
-
-      try {
-        window.speechSynthesis.speak(utterance);
-      } catch {
-        resolveLetter();
-      }
-    });
-
-    // Pause between letters so learner clearly hears each letter
+    // Pause between letters so the learner clearly hears each one.
     if (i < letters.length - 1) {
       await new Promise((r) => setTimeout(r, 380));
     }
@@ -156,50 +163,35 @@ export async function speakSpellingSequence(
 
   options?.onActiveIndex?.(-1);
   options?.onComplete?.();
+  return 'spoken';
 }
 
 // ---------------------------------------------------------------------------
-// Script-appropriate Grapheme Segmentation
+// Script-appropriate segmentation
 // ---------------------------------------------------------------------------
 
 /**
- * Segments Tamil Unicode text into linguistically sound syllabic grapheme units
- * (உயிர், மெய், உயிர்மெய்).
- *
- * NEVER splits combining marks (ா, ி, ீ, etc.) or virama pulli (்) into isolated
- * broken characters.
+ * Splits text into user-perceived characters (grapheme clusters), so combining
+ * vowel signs and viramas are never shown as isolated broken marks.
  */
-export function getTamilGraphemes(text: string): string[] {
+export function getGraphemes(text: string, locale: string): string[] {
   const clean = text.trim();
   if (!clean) return [];
 
   if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
     try {
-      const segmenter = new (Intl as unknown as {
-        Segmenter: new (
-          locale: string,
-          options: { granularity: string },
-        ) => { segment: (input: string) => Iterable<{ segment: string }> };
-      }).Segmenter('ta', { granularity: 'grapheme' });
-
-      const segments = Array.from(segmenter.segment(clean), (s) => s.segment);
-      return segments.filter((s) => s.trim() !== '');
+      const segmenter = new Intl.Segmenter(locale, { granularity: 'grapheme' });
+      return Array.from(segmenter.segment(clean), (s) => s.segment).filter((s) => s.trim() !== '');
     } catch {
-      // Fall through to regex
+      // Fall through to code points.
     }
   }
 
-  // Fallback: match Tamil base consonant/vowel plus any number of combining marks
-  const matches = clean.match(
-    /([\u0B85-\u0B94\u0B95-\u0BB9][\u0BBE-\u0BCD\u0BD7]*|[\u0B82\u0B83]|.)/gu,
-  );
-  return (matches ?? [clean]).filter((s) => s.trim() !== '');
+  return Array.from(clean).filter((s) => s.trim() !== '');
 }
 
-/**
- * Extracts uppercase English letter names for spelling practice.
- */
-export function getEnglishLetters(text: string): string[] {
+/** Extracts uppercase Latin letters for spelling practice. */
+export function getLatinLetters(text: string): string[] {
   return text
     .toUpperCase()
     .replace(/[^A-Z]/g, '')
@@ -208,40 +200,27 @@ export function getEnglishLetters(text: string): string[] {
 
 export interface ScriptBreakdown {
   units: string[];
-  isEnglish: boolean;
-  isTamil: boolean;
-  scriptLabel: string;
+  segmentation: LanguageConfig['segmentation'];
+  unitsLabel: string;
   spokenSpellingSupported: boolean;
-  unsupportedReason?: string;
+  note?: string;
 }
 
 /**
- * Returns script-appropriate breakdown and indicates whether spoken letter-by-letter
- * assessment is supported by the assessment provider.
+ * Returns the script-appropriate breakdown of `text` for `language`, and
+ * whether spoken letter-by-letter checking is offered for it.
  */
-export function getScriptBreakdown(text: string, locale: string): ScriptBreakdown {
-  const isTamil = locale.toLowerCase().startsWith('ta') || /[\u0B80-\u0BFF]/.test(text);
+export function getScriptBreakdown(text: string, language: LanguageConfig): ScriptBreakdown {
+  const units =
+    language.segmentation === 'latin-letters'
+      ? getLatinLetters(text)
+      : getGraphemes(text, language.code);
 
-  if (isTamil) {
-    const units = getTamilGraphemes(text);
-    return {
-      units,
-      isEnglish: false,
-      isTamil: true,
-      scriptLabel: 'Tamil Syllabic Graphemes (உயிர் / மெய் / உயிர்மெய்)',
-      spokenSpellingSupported: false,
-      unsupportedReason:
-        'Spoken letter-by-letter spelling assessment is not supported for Tamil (ta-IN) in Azure Speech. Tamil spelling uses syllabic graphemes. Spoken spelling assessment is available for English words. Please proceed to ordinary word pronunciation practice.',
-    };
-  }
-
-  // English (or Latin-based content)
-  const units = getEnglishLetters(text);
   return {
     units,
-    isEnglish: true,
-    isTamil: false,
-    scriptLabel: 'English Letter Sequence',
-    spokenSpellingSupported: true,
+    segmentation: language.segmentation,
+    unitsLabel: language.unitsLabel,
+    spokenSpellingSupported: language.spokenSpelling,
+    note: language.spellingNote,
   };
 }

@@ -1,6 +1,10 @@
 /**
  * Reliable illustrations for word-based practice items.
  *
+ * Pictures are looked up by the item's text or its English translation, so a
+ * new language needs no changes here as long as its seed has translations.
+ * They deliberately carry no caption: the picture must not give away the word.
+ *
  * All illustrations are self-contained vector SVGs encoded as Data URIs.
  * They require zero external network requests, work 100% offline, never 404,
  * and render razor-sharp across all screen densities.
@@ -25,7 +29,6 @@ const MOTHER_SVG = `
   <path d="M165 160 C165 138, 205 138, 205 160 Z" fill="#EC4899"/>
   <!-- Heart icon -->
   <path d="M160 50 C155 42, 145 42, 140 48 C133 56, 160 74, 160 74 C160 74, 187 56, 180 48 C175 42, 165 42, 160 50 Z" fill="#E11D48"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#9D174D">Mother</text>
 </svg>
 `;
 
@@ -40,7 +43,6 @@ const FATHER_SVG = `
   <path d="M170 160 C170 138, 210 138, 210 160 Z" fill="#3B82F6"/>
   <!-- Star icon -->
   <path d="M160 42 L163 50 L172 50 L165 55 L168 64 L160 59 L152 64 L155 55 L148 50 L157 50 Z" fill="#F59E0B"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#1E40AF">Father</text>
 </svg>
 `;
 
@@ -54,7 +56,6 @@ const WATER_SVG = `
   <!-- Ripples -->
   <ellipse cx="160" cy="170" rx="50" ry="12" fill="#38BDF8" fill-opacity="0.4"/>
   <ellipse cx="160" cy="170" rx="30" ry="7" fill="#0284C7" fill-opacity="0.6"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#0369A1">Water</text>
 </svg>
 `;
 
@@ -73,7 +74,6 @@ const HOUSE_SVG = `
   <!-- Window -->
   <rect x="125" y="120" width="16" height="16" rx="2" fill="#FEF3C7"/>
   <rect x="175" y="120" width="16" height="16" rx="2" fill="#FEF3C7"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#92400E">House</text>
 </svg>
 `;
 
@@ -96,7 +96,6 @@ const FLOWER_SVG = `
   <circle cx="178" cy="128" r="22" fill="#E879F9"/>
   <!-- Flower center -->
   <circle cx="160" cy="110" r="18" fill="#FACC15"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#86198F">Flower</text>
 </svg>
 `;
 
@@ -111,7 +110,6 @@ const FRIEND_SVG = `
   <path d="M165 160 C165 125, 220 125, 220 160 Z" fill="#0EA5E9"/>
   <!-- Handshake / arm around shoulder -->
   <path d="M130 130 Q160 145, 190 130" stroke="#0F766E" stroke-width="4" stroke-linecap="round"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#0F766E">Friend</text>
 </svg>
 `;
 
@@ -131,7 +129,6 @@ const BOOK_SVG = `
   <line x1="175" y1="95" x2="210" y2="100" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round"/>
   <line x1="175" y1="110" x2="210" y2="115" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round"/>
   <line x1="175" y1="125" x2="210" y2="130" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#4338CA">Book</text>
 </svg>
 `;
 
@@ -148,7 +145,6 @@ const FOOD_SVG = `
   <path d="M140 100 Q145 85, 140 75" stroke="#FB923C" stroke-width="3" stroke-linecap="round" fill="none"/>
   <path d="M160 95 Q165 80, 160 70" stroke="#FB923C" stroke-width="3" stroke-linecap="round" fill="none"/>
   <path d="M180 100 Q185 85, 180 75" stroke="#FB923C" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#C2410C">Food</text>
 </svg>
 `;
 
@@ -174,7 +170,6 @@ const SCHOOL_SVG = `
   <!-- Windows -->
   <rect x="112" y="115" width="16" height="16" rx="2" fill="#BBF7D0"/>
   <rect x="192" y="115" width="16" height="16" rx="2" fill="#BBF7D0"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#14532D">School</text>
 </svg>
 `;
 
@@ -194,7 +189,6 @@ const TEETH_SVG = `
   <rect x="194" y="116" width="16" height="14" rx="3" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
   <!-- Sparkle on teeth -->
   <path d="M152 110 L154 116 L160 118 L154 120 L152 126 L150 120 L144 118 L150 116 Z" fill="#38BDF8"/>
-  <text x="160" y="210" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#0369A1">Teeth</text>
 </svg>
 `;
 
@@ -216,19 +210,7 @@ const GENERIC_FALLBACK_SVG = `
 // ---------------------------------------------------------------------------
 
 const IMAGE_MAP: Record<string, string> = {
-  // Tamil seed words
-  அம்மா: svgToDataUri(MOTHER_SVG),
-  அப்பா: svgToDataUri(FATHER_SVG),
-  நீர்: svgToDataUri(WATER_SVG),
-  தண்ணீர்: svgToDataUri(WATER_SVG),
-  வீடு: svgToDataUri(HOUSE_SVG),
-  பூ: svgToDataUri(FLOWER_SVG),
-  நண்பன்: svgToDataUri(FRIEND_SVG),
-  புத்தகம்: svgToDataUri(BOOK_SVG),
-  சாப்பாடு: svgToDataUri(FOOD_SVG),
-  பள்ளிக்கூடம்: svgToDataUri(SCHOOL_SVG),
-
-  // English words and translations
+  // Keyed by English word / meaning, so any language maps via its translation.
   mother: svgToDataUri(MOTHER_SVG),
   father: svgToDataUri(FATHER_SVG),
   water: svgToDataUri(WATER_SVG),
@@ -264,7 +246,7 @@ export function getWordImage(
     };
   }
 
-  const cleanText = text.trim();
+  const cleanText = text.trim().toLowerCase();
   if (IMAGE_MAP[cleanText]) {
     return {
       src: IMAGE_MAP[cleanText],

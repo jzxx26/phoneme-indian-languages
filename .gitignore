@@ -23,3 +23,8 @@ next-env.d.ts
 # supabase local
 supabase/.temp/
 supabase/.branches/
+
+# python (services/speech)
+.venv/
+__pycache__/
+.pytest_cache/

@@ -27,4 +27,16 @@ export function serverEnv() {
   };
 }
 
+/**
+ * The self-hosted open-source scoring service (services/speech). Neither value
+ * is required: the URL defaults to the local dev address, and the token is only
+ * needed when the service is started with SPEECH_SERVICE_TOKEN.
+ */
+export function speechServiceEnv() {
+  return {
+    url: (process.env.SPEECH_SERVICE_URL?.trim() || 'http://127.0.0.1:8765').replace(/\/+$/, ''),
+    token: process.env.SPEECH_SERVICE_TOKEN?.trim() || undefined,
+  };
+}
+
 export const isProduction = process.env.NODE_ENV === 'production';

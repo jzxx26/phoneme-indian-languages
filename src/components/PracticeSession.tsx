@@ -465,6 +465,13 @@ export function PracticeSession({
                 <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
                   Development mock provider
                 </span>
+              ) : result.provider === 'mms' ? (
+                <span
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
+                  title="Scored by the self-hosted open-source engine (Meta MMS)"
+                >
+                  Open-source engine
+                </span>
               ) : null}
             </div>
 

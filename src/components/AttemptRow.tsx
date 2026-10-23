@@ -27,7 +27,7 @@ export function AttemptRow({
           <p className="font-indic truncate text-lg text-slate-900">{attempt.reference_text}</p>
           <p className="text-xs text-slate-500">
             {formatDateTime(attempt.created_at)}
-            {attempt.provider === 'mock' ? ' · mock provider' : ''}
+            {attempt.provider === 'mock' ? ' · mock provider' : attempt.provider === 'mms' ? ' · open-source engine' : ''}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">

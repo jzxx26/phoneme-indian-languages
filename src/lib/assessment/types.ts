@@ -36,7 +36,8 @@ export interface AssessmentResult {
   provider: AssessmentProviderName;
 }
 
-export type AssessmentProviderName = 'azure' | 'mock';
+/** 'mms' is the self-hosted open-source engine in services/speech. */
+export type AssessmentProviderName = 'azure' | 'mms' | 'mock';
 
 export interface AssessmentInput {
   audio: ArrayBuffer;

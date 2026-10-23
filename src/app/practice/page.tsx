@@ -100,7 +100,11 @@ export default async function PracticePage({
     <>
       <NavBar displayName={displayName} language={language} />
       <main className="mx-auto max-w-4xl px-4 py-6 sm:py-8">
+        {/* Keyed so switching language (a soft navigation to the same page)
+            starts a fresh session instead of keeping the old item index and
+            reveal state against the new language's items. */}
         <PracticeSession
+          key={`${language.code}:${requestedSentenceId ?? ''}`}
           language={language}
           sentences={sentences}
           startIndex={startIndex}

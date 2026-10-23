@@ -296,6 +296,7 @@ export function PracticeSession({
         {isWord ? (
           <div className="mt-4">
             <WordImage
+              key={sentence.id}
               text={sentence.text}
               translation={sentence.translation}
               customImageUrl={sentence.image_url}

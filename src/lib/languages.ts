@@ -31,7 +31,13 @@ export const LANGUAGES: readonly LanguageConfig[] = [
     enabled: true,
     scriptClassName: 'font-indic',
   },
-  // Review 2 and 3 will append additional Indian languages here.
+  {
+    code: 'en-IN',
+    name: 'English',
+    nativeName: 'English',
+    enabled: true,
+    scriptClassName: 'font-sans',
+  },
 ] as const;
 
 /** The locale used when a caller does not specify one. */

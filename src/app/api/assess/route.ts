@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAssessmentProvider } from '@/lib/assessment/provider';
 import { AssessmentError } from '@/lib/assessment/types';
 import { isLanguageEnabled } from '@/lib/languages';
+import { findDemoSentence } from '@/lib/demo-sentences';
 import type { SentenceRow } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
   }
 
   // Reference text + locale come from the database, never from the client.
-  const { data: sentence, error: sentenceError } = await supabase
+  const { data: dbSentence, error: sentenceError } = await supabase
     .from('sentences')
     .select('id, language_code, text, is_active')
     .eq('id', sentenceId)
@@ -78,6 +79,20 @@ export async function POST(request: Request) {
   if (sentenceError) {
     return fail(500, 'database_error', 'Could not load the practice sentence.');
   }
+
+  let sentence = dbSentence;
+  if (!sentence || !sentence.is_active) {
+    const demo = findDemoSentence(sentenceId);
+    if (demo) {
+      sentence = {
+        id: demo.id,
+        language_code: demo.language_code,
+        text: demo.text,
+        is_active: true,
+      };
+    }
+  }
+
   if (!sentence || !sentence.is_active) {
     return fail(404, 'sentence_not_found', 'That practice sentence is no longer available.');
   }

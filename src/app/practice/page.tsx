@@ -6,6 +6,8 @@ import { requireSession } from '@/lib/session';
 import { DEFAULT_LANGUAGE_CODE, resolveLanguage } from '@/lib/languages';
 import type { SentenceProgressRow, SentenceRow } from '@/types/database';
 
+import { DEMO_ENGLISH_SENTENCES } from '@/lib/demo-sentences';
+
 export const dynamic = 'force-dynamic';
 
 type PracticeSentence = Pick<
@@ -44,9 +46,12 @@ export default async function PracticePage({
       >(),
   ]);
 
-  const sentences = sentencesResponse.data ?? [];
+  let sentences = sentencesResponse.data ?? [];
+  if (sentences.length === 0 && language.code.startsWith('en')) {
+    sentences = DEMO_ENGLISH_SENTENCES;
+  }
 
-  if (sentencesResponse.error || sentences.length === 0) {
+  if (sentences.length === 0) {
     return (
       <>
         <NavBar displayName={displayName} language={language} />

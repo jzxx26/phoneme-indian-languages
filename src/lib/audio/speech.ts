@@ -79,6 +79,23 @@ export async function hasVoiceFor(locale: string): Promise<boolean> {
   return (await findVoice(locale)) !== null;
 }
 
+/**
+ * Plays neural-voice audio from /api/tts. Resolves true once it has played to
+ * the end, false if the service is unavailable or playback fails.
+ */
+function playServerVoice(text: string, locale: string, slow = true): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof Audio === 'undefined') return Promise.resolve(false);
+
+  const params = new URLSearchParams({ text, locale, slow: String(slow) });
+  const audio = new Audio(`/api/tts?${params.toString()}`);
+  return new Promise((resolve) => {
+    audio.onended = () => resolve(true);
+    audio.onerror = () => resolve(false);
+    // Started from the learner's click, so autoplay rules allow it.
+    audio.play().catch(() => resolve(false));
+  });
+}
+
 function speakWithVoice(text: string, voice: SpeechSynthesisVoice, rate: number): Promise<void> {
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(text);
@@ -97,30 +114,35 @@ function speakWithVoice(text: string, voice: SpeechSynthesisVoice, rate: number)
 }
 
 /**
- * Speaks a word or short phrase aloud using browser SpeechSynthesis.
+ * Speaks a word or short phrase aloud: the server's neural voice first, then
+ * the browser's own voice for the language.
  *
- * When no voice for the language is installed it does NOT fall back to a
- * different language's voice (that would teach the wrong pronunciation); it
- * resolves 'no-voice' so the caller can tell the learner.
+ * It never falls back to a different language's voice (that would teach the
+ * wrong pronunciation); when neither is available it resolves 'no-voice' so
+ * the caller can tell the learner.
  */
 export async function speakWord(
   text: string,
   locale: string,
   options?: { rate?: number; onStart?: () => void; onEnd?: () => void },
 ): Promise<SpeakOutcome> {
+  cancelSpeech();
+  options?.onStart?.();
+  if (await playServerVoice(text, locale)) {
+    options?.onEnd?.();
+    return 'spoken';
+  }
+
   if (!isSpeechSynthesisSupported()) {
     options?.onEnd?.();
     return 'unsupported';
   }
-
-  cancelSpeech();
   const voice = await findVoice(locale);
   if (!voice) {
     options?.onEnd?.();
     return 'no-voice';
   }
 
-  options?.onStart?.();
   // Slightly slower for clear teaching articulation.
   await speakWithVoice(text, voice, options?.rate ?? 0.85);
   options?.onEnd?.();
@@ -139,21 +161,29 @@ export async function speakSpellingSequence(
     onComplete?: () => void;
   },
 ): Promise<SpeakOutcome> {
-  if (!isSpeechSynthesisSupported() || letters.length === 0) {
+  if (letters.length === 0) {
     options?.onComplete?.();
     return 'unsupported';
   }
 
   cancelSpeech();
-  const voice = await findVoice(locale);
-  if (!voice) {
+  // Use the server's neural voice if it can say the first letter; otherwise the
+  // browser's voice for the language.
+  options?.onActiveIndex?.(0);
+  const useServer = await playServerVoice(letters[0], locale, false);
+  const voice = useServer || !isSpeechSynthesisSupported() ? null : await findVoice(locale);
+  if (!useServer && !voice) {
+    options?.onActiveIndex?.(-1);
     options?.onComplete?.();
-    return 'no-voice';
+    return isSpeechSynthesisSupported() ? 'no-voice' : 'unsupported';
   }
 
   for (let i = 0; i < letters.length; i += 1) {
     options?.onActiveIndex?.(i);
-    await speakWithVoice(letters[i], voice, 0.8);
+    if (i > 0 || !useServer) {
+      if (useServer) await playServerVoice(letters[i], locale, false);
+      else if (voice) await speakWithVoice(letters[i], voice, 0.8);
+    }
 
     // Pause between letters so the learner clearly hears each one.
     if (i < letters.length - 1) {

@@ -2,6 +2,7 @@
 Open-source pronunciation scoring service.
 
     POST /assess   multipart: audio (16 kHz mono PCM WAV), reference_text, locale
+    GET  /tts      ?text=...&locale=...  -> MP3 of a neural voice saying `text`
     GET  /health
 
 Called only by the Next.js route handler (src/lib/assessment/mms.ts), never by
@@ -21,8 +22,8 @@ import wave
 from contextlib import asynccontextmanager
 
 import numpy as np
-from fastapi import FastAPI, File, Form, Header, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, Form, Header, Query, UploadFile
+from fastapi.responses import JSONResponse, Response
 
 from scoring import ScoringError, score_pronunciation
 
@@ -32,6 +33,21 @@ MAX_SECONDS = 30
 SILENCE_RMS = 0.003
 # 30 s of 16 kHz mono 16-bit PCM is ~960 KB; matches the app's own upload cap.
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+
+# Teach-aloud voices (Microsoft Edge neural voices via edge-tts: free, no key,
+# but needs internet). Browsers often ship no voice for Indian languages.
+TTS_VOICES = {
+    "ta-in": "ta-IN-PallaviNeural",
+    "hi-in": "hi-IN-SwaraNeural",
+    "en-in": "en-IN-NeerjaNeural",
+    "kn-in": "kn-IN-SapnaNeural",
+    "te-in": "te-IN-ShrutiNeural",
+    "ml-in": "ml-IN-SobhanaNeural",
+    "mr-in": "mr-IN-AarohiNeural",
+    "bn-in": "bn-IN-TanishaaNeural",
+    "gu-in": "gu-IN-DhwaniNeural",
+}
+MAX_TTS_CHARS = 200
 
 _model = None
 
@@ -80,6 +96,42 @@ def decode_wav(data: bytes) -> np.ndarray:
     return audio
 
 
+def _authorized(authorization: str | None) -> bool:
+    expected_token = os.environ.get("SPEECH_SERVICE_TOKEN", "").strip()
+    if not expected_token:
+        return True
+    supplied = (authorization or "").removeprefix("Bearer ").strip()
+    return hmac.compare_digest(supplied, expected_token)
+
+
+@app.get("/tts")
+async def tts(
+    text: str = Query(..., min_length=1, max_length=MAX_TTS_CHARS),
+    locale: str = Query(...),
+    slow: bool = Query(default=True),
+    authorization: str | None = Header(default=None),
+):
+    if not _authorized(authorization):
+        return _error(401, "provider_unauthorized", "Invalid speech service token.")
+    voice = TTS_VOICES.get(locale.lower())
+    if voice is None:
+        return _error(400, "locale_unsupported", f"No teaching voice for locale {locale}.")
+
+    import edge_tts
+
+    try:
+        communicate = edge_tts.Communicate(text, voice, rate="-15%" if slow else "+0%")
+        audio = bytearray()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio.extend(chunk["data"])
+    except Exception:  # network / upstream failure
+        return _error(503, "provider_unavailable", "The teaching voice is unavailable right now.")
+    if not audio:
+        return _error(503, "provider_unavailable", "The teaching voice returned no audio.")
+    return Response(bytes(audio), media_type="audio/mpeg")
+
+
 @app.get("/health")
 def health():
     return {
@@ -96,11 +148,8 @@ def assess(
     locale: str = Form(...),
     authorization: str | None = Header(default=None),
 ):
-    expected_token = os.environ.get("SPEECH_SERVICE_TOKEN", "").strip()
-    if expected_token:
-        supplied = (authorization or "").removeprefix("Bearer ").strip()
-        if not hmac.compare_digest(supplied, expected_token):
-            return _error(401, "provider_unauthorized", "Invalid speech service token.")
+    if not _authorized(authorization):
+        return _error(401, "provider_unauthorized", "Invalid speech service token.")
 
     try:
         data = audio.file.read(MAX_UPLOAD_BYTES + 1)

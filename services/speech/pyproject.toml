@@ -11,6 +11,7 @@ dependencies = [
   "torch>=2.4",
   "transformers>=4.56",
   "safetensors>=0.4",
+  "edge-tts>=7.0",
 ]
 
 [dependency-groups]

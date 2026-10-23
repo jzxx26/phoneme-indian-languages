@@ -21,14 +21,14 @@ export function WordImage({
   className = '',
 }: WordImageProps) {
   const initial = getWordImage(text, translation, customImageUrl);
-  const [imageSrc, setImageSrc] = useState(initial.src);
-  const [isFailed, setIsFailed] = useState(false);
+  // Derived from the current word on every render; only a load failure is
+  // remembered, and only for the image that failed, so moving to the next
+  // word always shows that word's picture.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const imageSrc = failedSrc === initial.src ? FALLBACK_IMAGE_URI : initial.src;
 
   const handleImageError = () => {
-    if (!isFailed) {
-      setIsFailed(true);
-      setImageSrc(FALLBACK_IMAGE_URI);
-    }
+    if (imageSrc !== FALLBACK_IMAGE_URI) setFailedSrc(initial.src);
   };
 
   return (

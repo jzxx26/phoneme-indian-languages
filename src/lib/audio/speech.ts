@@ -18,7 +18,7 @@ import type { LanguageConfig } from '@/lib/languages';
 /** How long to wait for the browser to load its voice list. */
 const VOICE_LOAD_TIMEOUT_MS = 1500;
 
-export type SpeakOutcome = 'spoken' | 'no-voice' | 'unsupported';
+export type SpeakOutcome = 'spoken' | 'no-voice' | 'unsupported' | 'cancelled';
 
 export function isSpeechSynthesisSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -83,32 +83,57 @@ export async function hasVoiceFor(locale: string): Promise<boolean> {
  * Plays neural-voice audio from /api/tts. Resolves true once it has played to
  * the end, false if the service is unavailable or playback fails.
  */
-function playServerVoice(text: string, locale: string, slow = true): Promise<boolean> {
+function playServerVoice(text: string, locale: string, slow = true, signal?: AbortSignal): Promise<boolean> {
   if (typeof window === 'undefined' || typeof Audio === 'undefined') return Promise.resolve(false);
+
+  if (signal?.aborted) return Promise.resolve(false);
 
   const params = new URLSearchParams({ text, locale, slow: String(slow) });
   const audio = new Audio(`/api/tts?${params.toString()}`);
   return new Promise((resolve) => {
-    audio.onended = () => resolve(true);
-    audio.onerror = () => resolve(false);
+    const finish = (played: boolean) => {
+      signal?.removeEventListener('abort', abort);
+      audio.onended = null;
+      audio.onerror = null;
+      resolve(played);
+    };
+    const abort = () => {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      finish(false);
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+    audio.onended = () => finish(true);
+    audio.onerror = () => finish(false);
     // Started from the learner's click, so autoplay rules allow it.
-    audio.play().catch(() => resolve(false));
+    audio.play().catch(() => finish(false));
   });
 }
 
-function speakWithVoice(text: string, voice: SpeechSynthesisVoice, rate: number): Promise<void> {
+function speakWithVoice(text: string, voice: SpeechSynthesisVoice, rate: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voice;
     utterance.lang = voice.lang;
     utterance.rate = rate;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+    const finish = () => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    };
+    const abort = () => {
+      cancelSpeech();
+      finish();
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+    utterance.onend = finish;
+    utterance.onerror = finish;
 
     try {
       window.speechSynthesis.speak(utterance);
     } catch {
-      resolve();
+      finish();
     }
   });
 }
@@ -124,29 +149,73 @@ function speakWithVoice(text: string, voice: SpeechSynthesisVoice, rate: number)
 export async function speakWord(
   text: string,
   locale: string,
-  options?: { rate?: number; onStart?: () => void; onEnd?: () => void },
+  options?: { rate?: number; onStart?: () => void; onEnd?: () => void; signal?: AbortSignal },
 ): Promise<SpeakOutcome> {
+  if (options?.signal?.aborted) return 'cancelled';
   cancelSpeech();
   options?.onStart?.();
-  if (await playServerVoice(text, locale)) {
+  if (await playServerVoice(text, locale, true, options?.signal)) {
     options?.onEnd?.();
     return 'spoken';
   }
+
+  if (options?.signal?.aborted) return 'cancelled';
 
   if (!isSpeechSynthesisSupported()) {
     options?.onEnd?.();
     return 'unsupported';
   }
   const voice = await findVoice(locale);
+  if (options?.signal?.aborted) return 'cancelled';
   if (!voice) {
     options?.onEnd?.();
     return 'no-voice';
   }
 
   // Slightly slower for clear teaching articulation.
-  await speakWithVoice(text, voice, options?.rate ?? 0.85);
+  await speakWithVoice(text, voice, options?.rate ?? 0.85, options?.signal);
+  if (options?.signal?.aborted) return 'cancelled';
   options?.onEnd?.();
   return 'spoken';
+}
+
+/** Whitespace-delimited poem words, keeping Indic combining marks intact. */
+export function getSpokenWords(text: string): string[] {
+  return text.split(/\s+/u)
+    .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{M}\p{N}]+$/gu, ''))
+    .filter((word) => /[\p{L}\p{N}]/u.test(word));
+}
+
+/** Teach each word separately, with a pause before moving to the next one. */
+export async function speakWordSequence(
+  words: string[],
+  locale: string,
+  options: { signal: AbortSignal; onActiveIndex?: (index: number) => void },
+): Promise<SpeakOutcome> {
+  try {
+    if (words.length === 0) return 'unsupported';
+    for (let index = 0; index < words.length; index += 1) {
+      if (options.signal.aborted) return 'cancelled';
+      options.onActiveIndex?.(index);
+      const outcome = await speakWord(words[index], locale, { signal: options.signal });
+      if (options.signal.aborted) return 'cancelled';
+      if (outcome !== 'spoken') return outcome;
+      if (index < words.length - 1) {
+        await new Promise<void>((resolve) => {
+          const finish = () => {
+            clearTimeout(timer);
+            options.signal.removeEventListener('abort', finish);
+            resolve();
+          };
+          const timer = setTimeout(finish, 350);
+          options.signal.addEventListener('abort', finish, { once: true });
+        });
+      }
+    }
+    return 'spoken';
+  } finally {
+    options.onActiveIndex?.(-1);
+  }
 }
 
 /**

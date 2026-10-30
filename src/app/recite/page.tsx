@@ -121,7 +121,7 @@ export default async function RecitePage({
       <main className="mx-auto max-w-4xl px-4 py-6 sm:py-8">
         <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{language.name} Poems</h1>
         <p className="mt-1 text-slate-600">
-          Listen to a poem, then say it back line by line. Earn up to three stars for each poem.
+          Listen to each word of a poem, then say it back line by line. Earn up to three stars for each poem.
         </p>
 
         {verses.length === 0 ? (

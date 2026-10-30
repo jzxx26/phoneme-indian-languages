@@ -28,7 +28,7 @@ Design decisions and the full data flow: [`docs/ARCHITECTURE.md`](docs/ARCHITECT
 | `/login` | Sign in / create account (Supabase email + password) |
 | `/dashboard` | Your name, current language, attempt count, average score, best score, recent attempts |
 | `/practice` | The target text, the recorder, and the four scores plus word-level feedback. Word items first show a picture clue, then teach the word aloud (browser voice) before recording, and offer a **Spelling Lab** (letter-by-letter teaching; spoken-spelling check for English) |
-| `/recite` | **Poems.** Pick a verse, listen to the whole poem, then hear each line and say it back. Each line is scored with word feedback; the poem earns up to three stars |
+| `/recite` | **Poems.** Pick a verse and hear its words individually with short pauses and an active-word display. Both poem and line playback teach word by word; repeat each full line for assessment. Each line is scored with word feedback; the poem earns up to three stars |
 | `/history` | Every attempt, and a first-vs-latest improvement table per practice item |
 
 Every page has a language switcher; the current language travels in `?lang=`.

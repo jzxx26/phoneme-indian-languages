@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { RecordButton } from '@/components/RecordButton';
 import { WordFeedback } from '@/components/WordFeedback';
 import { useRecorder } from '@/lib/audio/useRecorder';
-import { cancelSpeech, speakWord } from '@/lib/audio/speech';
+import { cancelSpeech, getSpokenWords, speakWordSequence } from '@/lib/audio/speech';
 import type { AssessmentResult } from '@/lib/assessment/types';
 import type { LanguageConfig } from '@/lib/languages';
 import { formatScore, scoreChipClass, scoreLabel, scoreTextClass, starsFor } from '@/lib/scoring';
@@ -31,9 +31,9 @@ function Stars({ score, size = 'text-3xl' }: { score: number | null; size?: stri
 }
 
 /**
- * Hear-and-repeat recitation of one verse: listen to the whole poem, then to
- * each line in turn and say it back. Every line is scored by /api/assess like
- * any practice item, so attempts and progress are stored as usual.
+ * Hear each poem word individually, then repeat each line for assessment.
+ * Every line is scored by /api/assess like any practice item, so attempts
+ * and progress are stored as usual.
  */
 export function ReciteSession({
   language,
@@ -57,7 +57,24 @@ export function ReciteSession({
   const [voiceMissing, setVoiceMissing] = useState(false);
   const [showMeaning, setShowMeaning] = useState(false);
 
-  useEffect(() => () => cancelSpeech(), []);
+  const playback = useRef<AbortController | null>(null);
+  const [activeWord, setActiveWord] = useState<string | null>(null);
+
+  const stopPlayback = useCallback(() => {
+    const controller = playback.current;
+    playback.current = null;
+    controller?.abort();
+    cancelSpeech();
+    setPlaying(null);
+    setActiveWord(null);
+  }, []);
+
+  useEffect(() => () => {
+    const controller = playback.current;
+    playback.current = null;
+    controller?.abort();
+    cancelSpeech();
+  }, []);
 
   const finished = lineIndex >= lines.length;
   const line = finished ? null : lines[lineIndex];
@@ -70,20 +87,31 @@ export function ReciteSession({
 
   const play = useCallback(
     async (what: Exclude<Playing, null>, text: string) => {
+      stopPlayback();
+      const controller = new AbortController();
+      playback.current = controller;
+      const words = getSpokenWords(text);
       setPlaying(what);
-      const outcome = await speakWord(text, language.code);
-      setVoiceMissing(outcome !== 'spoken');
+      setVoiceMissing(false);
+      const outcome = await speakWordSequence(words, language.code, {
+        signal: controller.signal,
+        onActiveIndex: (index) => {
+          if (playback.current === controller) setActiveWord(words[index] ?? null);
+        },
+      });
+      if (playback.current !== controller) return;
+      playback.current = null;
+      setVoiceMissing(outcome !== 'spoken' && outcome !== 'cancelled');
       setPlaying(null);
     },
-    [language.code],
+    [language.code, stopPlayback],
   );
 
   const handleStart = useCallback(async () => {
-    cancelSpeech();
-    setPlaying(null);
+    stopPlayback();
     setError(null);
     await recorder.start();
-  }, [recorder]);
+  }, [recorder, stopPlayback]);
 
   const handleStop = useCallback(async () => {
     if (!line) return;
@@ -111,13 +139,12 @@ export function ReciteSession({
 
   const goToLine = useCallback(
     (index: number) => {
-      cancelSpeech();
-      setPlaying(null);
+      stopPlayback();
       setError(null);
       recorder.reset();
       setLineIndex(index);
     },
-    [recorder],
+    [recorder, stopPlayback],
   );
 
   const restart = useCallback(() => {
@@ -188,8 +215,17 @@ export function ReciteSession({
             disabled={playing !== null || recorder.isRecording || busy}
             className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-50"
           >
-            {playing === 'verse' ? '🔊 Playing…' : '🔊 Listen to the whole poem'}
+            {playing === 'verse' ? '🔊 Playing…' : '🔊 Listen to poem word by word'}
           </button>
+          {playing ? (
+            <button
+              type="button"
+              onClick={stopPlayback}
+              className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+            >
+              Stop listening
+            </button>
+          ) : null}
           {verse.meaning ? (
             <button
               type="button"
@@ -204,6 +240,11 @@ export function ReciteSession({
         {showMeaning && verse.meaning ? (
           <p className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-slate-700">{verse.meaning}</p>
         ) : null}
+        {playing && activeWord ? (
+          <p role="status" className={`${script} mt-3 text-2xl font-semibold text-sky-700`}>
+            {activeWord}
+          </p>
+        ) : null}
         {voiceMissing ? (
           <p role="status" className="mt-3 text-sm text-amber-800">
             The teaching voice is unavailable right now. You can still read the line and record it.
@@ -214,9 +255,9 @@ export function ReciteSession({
       {/* ------------------------------------------------------- current line */}
       {line ? (
         <Card>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>
-              Line {lineIndex + 1} of {lines.length}: listen, then say it back
+              Line {lineIndex + 1} of {lines.length}: listen word by word, then say the line back
             </CardTitle>
             <button
               type="button"
@@ -224,7 +265,7 @@ export function ReciteSession({
               disabled={playing !== null || recorder.isRecording || busy}
               className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
-              {playing === 'line' ? '🔊 Playing…' : '🔊 Listen'}
+              {playing === 'line' ? '🔊 Playing…' : '🔊 Listen word by word'}
             </button>
           </div>
 

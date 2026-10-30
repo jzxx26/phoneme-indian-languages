@@ -1,5 +1,5 @@
 /**
- * Hand-written database types mirroring supabase/migrations/0001_init.sql.
+ * Hand-written database types mirroring supabase/migrations/*.sql.
  * Regenerate with `supabase gen types typescript` if the schema changes.
  */
 
@@ -28,6 +28,22 @@ export interface SentenceRow {
   transliteration: string | null;
   translation: string | null;
   kind: ContentKind;
+  difficulty: DifficultyLevel;
+  is_active: boolean;
+  created_at: string;
+  /** Set for lines of a verse (migration 0007); null for ordinary practice items. */
+  verse_id: string | null;
+  verse_line: number | null;
+}
+
+export interface VerseRow {
+  id: string;
+  language_code: string;
+  collection: string;
+  number: number;
+  title: string;
+  author: string | null;
+  meaning: string | null;
   difficulty: DifficultyLevel;
   is_active: boolean;
   created_at: string;

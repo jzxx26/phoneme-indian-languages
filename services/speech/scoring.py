@@ -329,14 +329,26 @@ def score_pronunciation(log_probs: np.ndarray, reference_text: str, vocab: Vocab
             }
         )
 
-    # Extra words the learner said that are not in the reference.
+    # Extra words the learner said that are not in the reference. A compound
+    # the recogniser split in two (e.g. "मुझसा" heard as "मुझ सा") is not extra:
+    # joined with a neighbour it matches a reference word.
+    reference_set = [w for w, _ in scorable]
+
+    def is_split_fragment(h: int) -> bool:
+        joined = []
+        if h > 0:
+            joined.append(hyp_words[h - 1] + hyp_words[h])
+        if h + 1 < len(hyp_words):
+            joined.append(hyp_words[h] + hyp_words[h + 1])
+        return any(_char_similarity(j, ref) >= 0.8 for j in joined for ref in reference_set)
+
     insertions = 0
     insert_after: list[tuple[int, str]] = []
     last_ref = -1
     for r, h in pairs:
         if r is not None:
             last_ref = r
-        elif h is not None and len(hyp_words[h]) >= 2:
+        elif h is not None and len(hyp_words[h]) >= 2 and not is_split_fragment(h):
             insertions += 1
             insert_after.append((last_ref, hyp_words[h]))
     for last_ref_index, extra in reversed(insert_after):

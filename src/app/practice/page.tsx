@@ -28,6 +28,8 @@ export default async function PracticePage({
       .select('id, text, transliteration, translation, kind, difficulty, language_code')
       .eq('language_code', language.code)
       .eq('is_active', true)
+      // Verse lines are practised on /recite, not in the item-by-item list.
+      .is('verse_id', null)
       .order('difficulty', { ascending: true })
       .order('created_at', { ascending: true })
       .returns<PracticeSentence[]>(),

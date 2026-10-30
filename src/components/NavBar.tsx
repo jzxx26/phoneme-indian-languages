@@ -6,6 +6,7 @@ import type { LanguageConfig } from '@/lib/languages';
 const LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/practice', label: 'Practice' },
+  { href: '/recite', label: 'Poems' },
   { href: '/history', label: 'History' },
 ];
 
@@ -27,7 +28,7 @@ export function NavBar({
           <LanguageSwitcher currentCode={language.code} />
         </div>
 
-        <nav className="flex items-center gap-1 text-sm" aria-label="Main">
+        <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label="Main">
           {LINKS.map((link) => (
             <Link
               key={link.href}

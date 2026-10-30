@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { requirePublicEnv } from '@/lib/env';
 
 /** Routes that require an authenticated session. */
-const PROTECTED_PREFIXES = ['/dashboard', '/practice', '/history'];
+const PROTECTED_PREFIXES = ['/dashboard', '/practice', '/recite', '/history'];
 
 /**
  * Refreshes the Supabase auth cookies on every request and applies route

@@ -5,7 +5,9 @@ yourself saying it, and a pronunciation assessment engine scores your attempt: M
 Pronunciation Assessment, or a free self-hosted open-source engine (Meta MMS) when Azure is not
 available. Every attempt is stored so you can see whether you are improving.
 
-**Languages:** Tamil (`ta-IN`, Review 1), English (`en-IN`) and Hindi (`hi-IN`, Review 2). The
+**Languages:** Tamil (`ta-IN`, Review 1), English (`en-IN`), Hindi (`hi-IN`), Kannada (`kn-IN`) and
+Punjabi (`pa-IN`, Gurmukhi). **Poems:** hear-and-repeat recitation of Thirukkural couplets (Tamil) and
+Kabir/Rahim dohe (Hindi), scored line by line. The
 schema, the API and the UI are all locale-parameterised, so new languages are added as data rather
 than as code changes.
 
@@ -26,6 +28,7 @@ Design decisions and the full data flow: [`docs/ARCHITECTURE.md`](docs/ARCHITECT
 | `/login` | Sign in / create account (Supabase email + password) |
 | `/dashboard` | Your name, current language, attempt count, average score, best score, recent attempts |
 | `/practice` | The target text, the recorder, and the four scores plus word-level feedback. Word items first show a picture clue, then teach the word aloud (browser voice) before recording, and offer a **Spelling Lab** (letter-by-letter teaching; spoken-spelling check for English) |
+| `/recite` | **Poems.** Pick a verse, listen to the whole poem, then hear each line and say it back. Each line is scored with word feedback; the poem earns up to three stars |
 | `/history` | Every attempt, and a first-vs-latest improvement table per practice item |
 
 Every page has a language switcher; the current language travels in `?lang=`.
@@ -49,6 +52,10 @@ Create a project at [supabase.com](https://supabase.com), then in the SQL editor
 2. `supabase/seed/0002_seed_tamil.sql` — the `ta-IN` language row and 20 Tamil practice items
 3. `supabase/seed/0003_seed_english.sql` — `en-IN` items (Review 2, used by the Spelling Lab)
 4. `supabase/seed/0004_seed_hindi.sql` — the `hi-IN` language row and 20 Hindi practice items
+5. `supabase/seed/0005_seed_kannada.sql` — the `kn-IN` language row and 20 Kannada practice items
+6. `supabase/seed/0006_seed_punjabi.sql` — the `pa-IN` language row and 20 Punjabi practice items
+7. `supabase/migrations/0007_verses.sql` — the `verses` table and verse-line columns on `sentences`
+8. `supabase/seed/0008_seed_verses.sql` — 6 Thirukkural couplets and 6 Hindi dohe
 
 Free Supabase projects pause after about a week without activity. If the app suddenly cannot load
 anything, open the Supabase dashboard and press **Restore project**.
@@ -171,7 +178,10 @@ npm run typecheck   # tsc --noEmit
 - Recordings are capped at 30 seconds, matching Azure's short-audio REST endpoint.
 - The spoken spelling check (`/api/assess/spelling`) needs Azure Speech; on the open-source engine
   it is refused with a clear message. Spelling attempts are not stored.
-- Teach-aloud uses the browser's own voices. If none is installed for a language, the app says so
+- Teach-aloud plays neural voices from the speech service (Microsoft Edge voices; Punjabi uses
+  Google Translate's voice because Edge has none), so it needs internet. If that fails it falls back
+  to the browser's own voices.
+- Without the speech service, teach-aloud uses the browser's own voices. If none is installed for a language, the app says so
   and lets you record anyway.
 - The open-source engine's model weights (Meta MMS) are licensed CC-BY-NC 4.0 — fine for this
   project, not for commercial use.

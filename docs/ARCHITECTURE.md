@@ -1,7 +1,8 @@
 # Architecture — Multilingual Pronunciation Learning and Assessment System
 
 Review 1: base platform + Tamil (`ta-IN`). Review 2: English (`en-IN`) with a Spelling Lab, Hindi
-(`hi-IN`), picture clues and teach-aloud, and a free open-source assessment engine.
+(`hi-IN`), Kannada (`kn-IN`), Punjabi (`pa-IN`), picture clues and teach-aloud, poem recitation
+(Thirukkural, dohe), and a free open-source assessment engine.
 
 ---
 
@@ -37,8 +38,10 @@ Review 2 as one registry entry plus a seed file.
 │   └── tests/test_scoring.py
 ├── supabase/
 │   ├── migrations/0001_init.sql    # tables, RLS, trigger, progress views
+│   ├── migrations/0007_verses.sql  # verses table + sentences.verse_id / verse_line
 │   └── seed/0002_seed_tamil.sql    # ta-IN language row + 20 practice items
-│       0003_seed_english.sql  0004_seed_hindi.sql
+│       0003_seed_english.sql  0004_seed_hindi.sql  0005_seed_kannada.sql
+│       0006_seed_punjabi.sql  0008_seed_verses.sql
 └── src/
     ├── middleware.ts               # refreshes auth cookies, guards routes
     ├── app/
@@ -46,6 +49,7 @@ Review 2 as one registry entry plus a seed file.
     │   ├── login/page.tsx
     │   ├── dashboard/page.tsx      # name, language, counts, average, recent
     │   ├── practice/page.tsx       # loads content server-side
+    │   ├── recite/page.tsx         # poems: verse list + hear-and-repeat session
     │   ├── history/page.tsx        # attempts + per-item improvement table
     │   ├── auth/callback/route.ts  # email confirmation -> session
     │   ├── api/assess/route.ts     # * the only place an assessment engine is called
@@ -111,6 +115,11 @@ Beyond the required columns the schema adds:
   `update` policy: an assessment result is immutable once recorded.
 
 A `security definer` trigger on `auth.users` creates the profile row at sign-up.
+
+**Verses** (migration 0007): `verses (id, language_code, collection, number, title, author,
+meaning, difficulty)`. Each line of a verse is an ordinary `sentences` row with `verse_id` and
+`verse_line` set, so reciting a line reuses `/api/assess`, `attempts` and the progress views
+unchanged. The practice list filters `verse_id is null`; a partial index backs that query.
 
 **Progress views** (`security_invoker = true`, so the caller's RLS still applies):
 
@@ -247,6 +256,8 @@ session so RLS remains the single enforcement point.
 | 14 | Review 2: language capability flags, spelling alignment fixes, language switcher | done |
 | 15 | Review 2: Hindi (`hi-IN`) registry entry + 20-item seed | done |
 | 16 | Open-source assessment engine (`services/speech`) + `mms` provider | done |
+| 17 | Kannada (`kn-IN`) + Punjabi (`pa-IN`): registry, seeds, MMS adapters, gTTS fallback voice | done |
+| 18 | Poems: `verses` table, Thirukkural + dohe seed, `/recite` hear-and-repeat with stars | done |
 
 Not built yet: phoneme-level drill-down, charts/analytics, spaced repetition, audio playback
 storage, storing spelling attempts.

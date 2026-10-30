@@ -152,3 +152,10 @@ def test_skipped_word_counts_against_accuracy():
     full = score_pronunciation(emissions("good day"), "good day", VOCAB)
     skipped = score_pronunciation(emissions("good"), "good day", VOCAB)
     assert skipped["accuracyScore"] < 60 < full["accuracyScore"]
+
+
+def test_compound_split_in_two_is_not_an_extra_word():
+    # The recogniser hears "goodday" as "good day": not an insertion.
+    result = score_pronunciation(emissions("good day"), "goodday", VOCAB)
+    assert [w["errorType"] for w in result["words"]] == ["None"]
+    assert result["completenessScore"] == 100

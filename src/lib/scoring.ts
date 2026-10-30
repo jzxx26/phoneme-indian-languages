@@ -95,3 +95,11 @@ export function describeErrorType(errorType: string | null | undefined): string 
       return errorType;
   }
 }
+
+/** Kid-friendly 0-3 stars: 3 for 80+, 2 for 60+, 1 for any scored attempt. */
+export function starsFor(score: number | null | undefined): number {
+  if (score === null || score === undefined || Number.isNaN(score)) return 0;
+  if (score >= 80) return 3;
+  if (score >= 60) return 2;
+  return 1;
+}

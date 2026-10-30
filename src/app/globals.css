@@ -5,7 +5,8 @@
      slightly larger optical size than Latin to stay readable. */
   --font-indic:
     'Noto Sans Tamil', 'Noto Sans Devanagari', 'Latha', 'Mangal', 'Nirmala UI',
-    'Tamil Sangam MN', 'Kohinoor Devanagari', 'Devanagari Sangam MN', system-ui, sans-serif;
+    'Tamil Sangam MN', 'Kohinoor Devanagari', 'Devanagari Sangam MN', 'Noto Sans Kannada', 'Tunga',
+    'Kannada Sangam MN', 'Noto Sans Gurmukhi', 'Raavi', 'Gurmukhi MN', system-ui, sans-serif;
 }
 
 :root {

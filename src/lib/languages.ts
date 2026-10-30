@@ -74,6 +74,30 @@ export const LANGUAGES: readonly LanguageConfig[] = [
     spellingNote:
       'Hindi is written in Devanagari: vowels (स्वर), consonants (व्यंजन) and vowel signs (मात्रा) that attach to a consonant. Each unit is read as a syllable rather than as a letter name.',
   },
+  {
+    code: 'kn-IN',
+    name: 'Kannada',
+    nativeName: 'ಕನ್ನಡ',
+    enabled: true,
+    scriptClassName: 'font-indic',
+    spokenSpelling: false,
+    segmentation: 'graphemes',
+    unitsLabel: 'Kannada letters (ಸ್ವರ / ವ್ಯಂಜನ / ಕಾಗುಣಿತ)',
+    spellingNote:
+      'Kannada is written with vowels (ಸ್ವರ), consonants (ವ್ಯಂಜನ) and consonant-vowel combinations (ಕಾಗುಣಿತ), where a vowel sign attaches to the consonant. Each unit is read as a syllable rather than as a letter name.',
+  },
+  {
+    code: 'pa-IN',
+    name: 'Punjabi',
+    nativeName: 'ਪੰਜਾਬੀ',
+    enabled: true,
+    scriptClassName: 'font-indic',
+    spokenSpelling: false,
+    segmentation: 'graphemes',
+    unitsLabel: 'Gurmukhi letters (ਸਵਰ / ਵਿਅੰਜਨ / ਲਗਾਂ-ਮਾਤਰਾਂ)',
+    spellingNote:
+      'Punjabi is written in Gurmukhi: vowels (ਸਵਰ), consonants (ਵਿਅੰਜਨ) and vowel signs (ਲਗਾਂ-ਮਾਤਰਾਂ) that attach to a consonant. Each unit is read as a syllable rather than as a letter name.',
+  },
 ] as const;
 
 /** The locale used when a caller does not specify one. */

@@ -15,6 +15,7 @@ If SPEECH_SERVICE_TOKEN is set, requests must send `Authorization: Bearer <token
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import io
 import os
@@ -34,8 +35,9 @@ SILENCE_RMS = 0.003
 # 30 s of 16 kHz mono 16-bit PCM is ~960 KB; matches the app's own upload cap.
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 
-# Teach-aloud voices (Microsoft Edge neural voices via edge-tts: free, no key,
-# but needs internet). Browsers often ship no voice for Indian languages.
+# Teach-aloud voices. Browsers often ship no voice for Indian languages, so the
+# service generates the audio. First choice: Microsoft Edge neural voices via
+# edge-tts (free, no key, needs internet).
 TTS_VOICES = {
     "ta-in": "ta-IN-PallaviNeural",
     "hi-in": "hi-IN-SwaraNeural",
@@ -46,6 +48,11 @@ TTS_VOICES = {
     "mr-in": "mr-IN-AarohiNeural",
     "bn-in": "bn-IN-TanishaaNeural",
     "gu-in": "gu-IN-DhwaniNeural",
+}
+# Fallback for locales with no Edge neural voice: Google Translate's voice via
+# gTTS (free, no key, needs internet). Value is the gTTS language code.
+GTTS_LANGS = {
+    "pa-in": "pa",
 }
 MAX_TTS_CHARS = 200
 
@@ -104,6 +111,26 @@ def _authorized(authorization: str | None) -> bool:
     return hmac.compare_digest(supplied, expected_token)
 
 
+async def _edge_tts(text: str, voice: str, slow: bool) -> bytes:
+    import edge_tts
+
+    communicate = edge_tts.Communicate(text, voice, rate="-15%" if slow else "+0%")
+    audio = bytearray()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio.extend(chunk["data"])
+    return bytes(audio)
+
+
+def _gtts(text: str, lang: str, slow: bool) -> bytes:
+    """Blocking (network) - call via asyncio.to_thread."""
+    from gtts import gTTS
+
+    buffer = io.BytesIO()
+    gTTS(text=text, lang=lang, slow=slow).write_to_fp(buffer)
+    return buffer.getvalue()
+
+
 @app.get("/tts")
 async def tts(
     text: str = Query(..., min_length=1, max_length=MAX_TTS_CHARS),
@@ -114,22 +141,20 @@ async def tts(
     if not _authorized(authorization):
         return _error(401, "provider_unauthorized", "Invalid speech service token.")
     voice = TTS_VOICES.get(locale.lower())
-    if voice is None:
+    gtts_lang = GTTS_LANGS.get(locale.lower())
+    if voice is None and gtts_lang is None:
         return _error(400, "locale_unsupported", f"No teaching voice for locale {locale}.")
 
-    import edge_tts
-
     try:
-        communicate = edge_tts.Communicate(text, voice, rate="-15%" if slow else "+0%")
-        audio = bytearray()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio.extend(chunk["data"])
+        if voice is not None:
+            audio = await _edge_tts(text, voice, slow)
+        else:
+            audio = await asyncio.to_thread(_gtts, text, gtts_lang, slow)
     except Exception:  # network / upstream failure
         return _error(503, "provider_unavailable", "The teaching voice is unavailable right now.")
     if not audio:
         return _error(503, "provider_unavailable", "The teaching voice returned no audio.")
-    return Response(bytes(audio), media_type="audio/mpeg")
+    return Response(audio, media_type="audio/mpeg")
 
 
 @app.get("/health")

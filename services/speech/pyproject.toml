@@ -12,6 +12,7 @@ dependencies = [
   "transformers>=4.56",
   "safetensors>=0.4",
   "edge-tts>=7.0",
+  "gTTS>=2.5",
 ]
 
 [dependency-groups]

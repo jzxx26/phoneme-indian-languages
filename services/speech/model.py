@@ -33,6 +33,7 @@ LOCALE_TO_MMS = {
     "mr-IN": "mar",
     "bn-IN": "ben",
     "gu-IN": "guj",
+    "pa-IN": "pan",
 }
 
 

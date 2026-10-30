@@ -80,5 +80,12 @@ uv run --group dev pytest
 
 ## Adding a language
 
-Add the app locale to `LOCALE_TO_MMS` in [`model.py`](model.py). The value is
-the MMS adapter's ISO 639-3 code; the supported list is on the model card.
+1. **Scoring:** add the app locale to `LOCALE_TO_MMS` in [`model.py`](model.py).
+   The value is the MMS adapter's ISO 639-3 code; the supported list is on the
+   model card.
+2. **Teach-aloud voice:** add the lower-cased locale to `TTS_VOICES` in
+   [`app.py`](app.py) with a Microsoft Edge neural voice name
+   (`.venv/bin/edge-tts --list-voices`). If Edge has no voice for the language
+   (Punjabi, for example), add it to `GTTS_LANGS` instead, using the gTTS
+   language code, so that it falls back to Google Translate's voice. Both need
+   internet access.
